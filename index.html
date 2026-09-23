@@ -1,0 +1,807 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Трекер карт</title>
+
+    <style>
+        body {
+            font-family: sans-serif;
+            background-color: #f4f4f4;
+            padding: 20px;
+            text-align: center;
+        }
+
+        h1 {
+            margin-bottom: 20px;
+        }
+
+        .controls {
+            margin-bottom: 20px;
+        }
+
+        .bottom-controls {
+            margin-top: 25px;
+        }
+
+        button {
+            margin: 0 10px;
+            padding: 8px 14px;
+            font-size: 14px;
+            cursor: pointer;
+            border: 2px solid #888;
+            border-radius: 5px;
+            background: #fff;
+        }
+
+        /* Кнопка "Противника" */
+        .btn-opponent {
+            border-color: red;
+            box-shadow: 0 0 5px red;
+        }
+
+        /* Кнопка "Моё" */
+        .btn-mine {
+            border-color: gold;
+            box-shadow: 0 0 5px gold;
+        }
+
+        .suit-row {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .card {
+            width: 60px;
+            height: 90px;
+            border: 2px solid #333;
+            border-radius: 6px;
+            transition:
+                    transform 0.1s ease,
+                    box-shadow 0.2s,
+                    border-color 0.2s,
+                    opacity 0.2s;
+
+            cursor: pointer;
+            box-sizing: border-box;
+        }
+
+        .card:hover {
+            transform: scale(1.05);
+        }
+
+        /* Карта противника */
+        .card.opponent {
+            border-color: red;
+            box-shadow: 0 0 5px red;
+        }
+
+        /* Выбранная карта */
+        .card.active {
+            outline: 3px solid #4caf50;
+            outline-offset: -2px;
+            box-shadow: 0 0 5px #4caf50;
+        }
+
+        /* Моя карта */
+        .card.mine {
+            border-color: gold;
+            box-shadow: 0 0 5px gold;
+        }
+
+        /*
+          Козырная карта.
+
+          Пока она ещё не определена как
+          моя или противника —
+          делаем её полупрозрачной.
+        */
+        .card.trump:not(.mine):not(.opponent):not(.disabled) {
+            opacity: 0.45;
+        }
+
+        /* Сброшенная / перевёрнутая карта */
+        .card.disabled {
+            pointer-events: none;
+            opacity: 0.6;
+        }
+    </style>
+</head>
+
+<body>
+
+<h1>Учёт сыгранных карт</h1>
+
+
+<!-- Основные кнопки -->
+<div class="controls">
+
+    <button
+            class="btn-opponent"
+            onclick="markAsOpponent()"
+    >
+        Противника
+    </button>
+
+    <button
+            class="btn-mine"
+            onclick="markAsMine()"
+    >
+        Моё
+    </button>
+
+    <button onclick="markAsDiscarded()">
+        Сбросить
+    </button>
+
+    <button onclick="markMineAndOpponent()">
+        Моё и его
+    </button>
+
+    <button onclick="undo()">
+        ↶ Назад
+    </button>
+
+</div>
+
+
+<!--
+  Контейнер всех мастей.
+
+  Обычный порядок:
+  1. Пики
+  2. Крести
+  3. Черви
+  4. Бубны
+-->
+<div id="card-table">
+
+
+    <!-- Пики -->
+    <div class="suit-row" data-suit="spades">
+
+        <img class="card"
+             src="cards/9_of_spades.png"
+             alt="9♠">
+
+        <img class="card"
+             src="cards/10_of_spades.png"
+             alt="10♠">
+
+        <img class="card"
+             src="cards/jack_of_spades.png"
+             alt="J♠">
+
+        <img class="card"
+             src="cards/queen_of_spades.png"
+             alt="Q♠">
+
+        <img class="card"
+             src="cards/king_of_spades.png"
+             alt="K♠">
+
+        <img class="card"
+             src="cards/ace_of_spades.png"
+             alt="A♠">
+
+    </div>
+
+
+    <!-- Крести -->
+    <div class="suit-row" data-suit="clubs">
+
+        <img class="card"
+             src="cards/9_of_clubs.png"
+             alt="9♣">
+
+        <img class="card"
+             src="cards/10_of_clubs.png"
+             alt="10♣">
+
+        <img class="card"
+             src="cards/jack_of_clubs.png"
+             alt="J♣">
+
+        <img class="card"
+             src="cards/queen_of_clubs.png"
+             alt="Q♣">
+
+        <img class="card"
+             src="cards/king_of_clubs.png"
+             alt="K♣">
+
+        <img class="card"
+             src="cards/ace_of_clubs.png"
+             alt="A♣">
+
+    </div>
+
+
+    <!-- Черви -->
+    <div class="suit-row" data-suit="hearts">
+
+        <img class="card"
+             src="cards/9_of_hearts.png"
+             alt="9♥">
+
+        <img class="card"
+             src="cards/10_of_hearts.png"
+             alt="10♥">
+
+        <img class="card"
+             src="cards/jack_of_hearts.png"
+             alt="J♥">
+
+        <img class="card"
+             src="cards/queen_of_hearts.png"
+             alt="Q♥">
+
+        <img class="card"
+             src="cards/king_of_hearts.png"
+             alt="K♥">
+
+        <img class="card"
+             src="cards/ace_of_hearts.png"
+             alt="A♥">
+
+    </div>
+
+
+    <!-- Бубны -->
+    <div class="suit-row" data-suit="diamonds">
+
+        <img class="card"
+             src="cards/9_of_diamonds.png"
+             alt="9♦">
+
+        <img class="card"
+             src="cards/10_of_diamonds.png"
+             alt="10♦">
+
+        <img class="card"
+             src="cards/jack_of_diamonds.png"
+             alt="J♦">
+
+        <img class="card"
+             src="cards/queen_of_diamonds.png"
+             alt="Q♦">
+
+        <img class="card"
+             src="cards/king_of_diamonds.png"
+             alt="K♦">
+
+        <img class="card"
+             src="cards/ace_of_diamonds.png"
+             alt="A♦">
+
+    </div>
+
+</div>
+
+
+<!-- Очистка -->
+<div class="bottom-controls">
+
+    <button onclick="resetSelection()">
+        Очистить всё
+    </button>
+
+</div>
+
+
+<script>
+
+    const cards = document.querySelectorAll('.card');
+    const cardTable = document.getElementById('card-table');
+
+    let actionStack = [];
+
+    /*
+      Здесь хранится текущая козырная карта.
+      Одновременно козырной может быть
+      только одна карта.
+    */
+    let trumpCard = null;
+
+
+    /*
+      Обычный порядок мастей.
+    */
+    const defaultSuitOrder = [
+        'spades',
+        'clubs',
+        'hearts',
+        'diamonds'
+    ];
+
+
+    /*
+      ЛЕВАЯ КНОПКА МЫШИ
+
+      Выделение карты зелёной рамкой.
+    */
+    cards.forEach(card => {
+
+        card.addEventListener('click', () => {
+
+            if (card.classList.contains('disabled')) {
+                return;
+            }
+
+            saveState();
+
+            card.classList.toggle('active');
+
+        });
+
+    });
+
+
+    /*
+      ПРАВАЯ КНОПКА МЫШИ
+
+      Назначаем карту козырной.
+    */
+    cards.forEach(card => {
+
+        card.addEventListener('contextmenu', event => {
+
+            /*
+              Убираем обычное меню браузера.
+            */
+            event.preventDefault();
+
+            /*
+              Перевёрнутую карту
+              козырной назначать нельзя.
+            */
+            if (card.classList.contains('disabled')) {
+                return;
+            }
+
+            /*
+              Если эта карта уже козырная,
+              ничего не делаем.
+            */
+            if (card.classList.contains('trump')) {
+                return;
+            }
+
+            saveState();
+
+
+            /*
+              Снимаем предыдущий козырь.
+            */
+            if (trumpCard) {
+                trumpCard.classList.remove('trump');
+            }
+
+
+            /*
+              Устанавливаем новый козырь.
+            */
+            card.classList.add('trump');
+
+            trumpCard = card;
+
+
+            /*
+              Перемещаем соответствующую
+              масть в самый низ.
+            */
+            reorderSuitRows();
+
+        });
+
+    });
+
+
+    /*
+      Перестановка рядов мастей.
+
+      Все масти идут в обычном порядке,
+      кроме козырной — она всегда последняя.
+    */
+    function reorderSuitRows() {
+
+        let trumpSuit = null;
+
+
+        /*
+          Определяем масть козыря.
+        */
+        if (trumpCard) {
+
+            const trumpRow =
+                trumpCard.closest('.suit-row');
+
+            if (trumpRow) {
+                trumpSuit = trumpRow.dataset.suit;
+            }
+
+        }
+
+
+        /*
+          Сначала располагаем обычные масти
+          в базовом порядке.
+        */
+        defaultSuitOrder.forEach(suit => {
+
+            if (suit === trumpSuit) {
+                return;
+            }
+
+            const row = document.querySelector(
+                `.suit-row[data-suit="${suit}"]`
+            );
+
+            if (row) {
+                cardTable.appendChild(row);
+            }
+
+        });
+
+
+        /*
+          Козырную масть добавляем последней.
+        */
+        if (trumpSuit) {
+
+            const trumpRow = document.querySelector(
+                `.suit-row[data-suit="${trumpSuit}"]`
+            );
+
+            if (trumpRow) {
+                cardTable.appendChild(trumpRow);
+            }
+
+        }
+
+    }
+
+
+    /*
+      Полная очистка.
+    */
+    function resetSelection() {
+
+        if (!confirm("Точно очистить всё?")) {
+            return;
+        }
+
+        saveState();
+
+        cards.forEach(card => {
+
+            card.classList.remove(
+                'active',
+                'opponent',
+                'disabled',
+                'mine',
+                'trump'
+            );
+
+            card.src = getOriginalSrc(card);
+
+        });
+
+
+        /*
+          Сбрасываем козырь.
+        */
+        trumpCard = null;
+
+
+        /*
+          Возвращаем стандартный
+          порядок мастей.
+        */
+        reorderSuitRows();
+
+    }
+
+
+    /*
+      Выбранные карты → противника.
+    */
+    function markAsOpponent() {
+
+        const selected =
+            document.querySelectorAll('.card.active');
+
+        if (selected.length === 0) {
+            return;
+        }
+
+        saveState();
+
+        selected.forEach(card => {
+
+            card.classList.remove(
+                'active',
+                'mine'
+            );
+
+            card.classList.add('opponent');
+
+        });
+
+    }
+
+
+    /*
+      Выбранные карты → мои.
+    */
+    function markAsMine() {
+
+        const selected =
+            document.querySelectorAll('.card.active');
+
+        if (selected.length === 0) {
+            return;
+        }
+
+        saveState();
+
+        selected.forEach(card => {
+
+            card.classList.remove(
+                'active',
+                'opponent'
+            );
+
+            card.classList.add('mine');
+
+        });
+
+    }
+
+
+    /*
+      Выбранные карты → сброшенные.
+    */
+    function markAsDiscarded() {
+
+        const selected =
+            document.querySelectorAll('.card.active');
+
+        if (selected.length === 0) {
+            return;
+        }
+
+        saveState();
+
+        selected.forEach(card => {
+
+            card.classList.remove(
+                'active',
+                'opponent',
+                'mine'
+            );
+
+            card.classList.add('disabled');
+
+            card.src = 'cards/back.png';
+
+        });
+
+    }
+
+
+    /*
+      МОЁ И ЕГО
+
+      Выбранные неперевёрнутые карты → мои.
+      Остальные неперевёрнутые → противника.
+
+      Перевёрнутые не трогаем.
+
+      Козырный статус также сохраняется.
+    */
+    function markMineAndOpponent() {
+
+        const selected =
+            document.querySelectorAll(
+                '.card.active:not(.disabled)'
+            );
+
+        if (selected.length === 0) {
+            return;
+        }
+
+        saveState();
+
+        cards.forEach(card => {
+
+            /*
+              Перевёрнутые карты не трогаем.
+            */
+            if (card.classList.contains('disabled')) {
+                return;
+            }
+
+
+            /*
+              Выделенная → моя.
+            */
+            if (card.classList.contains('active')) {
+
+                card.classList.remove(
+                    'active',
+                    'opponent'
+                );
+
+                card.classList.add('mine');
+
+            }
+
+            /*
+              Все остальные → противника.
+            */
+            else {
+
+                card.classList.remove(
+                    'mine',
+                    'active'
+                );
+
+                card.classList.add('opponent');
+
+            }
+
+        });
+
+    }
+
+
+    /*
+      Отмена последнего действия.
+    */
+    function undo() {
+
+        if (actionStack.length === 0) {
+            return;
+        }
+
+        const last = actionStack.pop();
+
+
+        /*
+          Возвращаем состояние карт.
+        */
+        last.forEach(entry => {
+
+            const {
+                card,
+                classes,
+                src
+            } = entry;
+
+            card.className = classes;
+            card.src = src;
+
+        });
+
+
+        /*
+          После восстановления классов
+          заново находим козырь.
+        */
+        trumpCard =
+            document.querySelector('.card.trump');
+
+
+        /*
+          И восстанавливаем правильный
+          порядок рядов.
+        */
+        reorderSuitRows();
+
+    }
+
+
+    /*
+      Сохранение состояния
+      перед каждым действием.
+    */
+    function saveState() {
+
+        const state = [];
+
+        cards.forEach(card => {
+
+            state.push({
+
+                card: card,
+
+                classes: card.className,
+
+                src: card.src
+
+            });
+
+        });
+
+
+        actionStack.push(state);
+
+
+        /*
+          Максимум 50 шагов назад.
+        */
+        if (actionStack.length > 50) {
+            actionStack.shift();
+        }
+
+    }
+
+
+    /*
+      Получаем оригинальную
+      картинку карты.
+    */
+    function getOriginalSrc(card) {
+
+        const alt = card.alt;
+
+
+        const rankMap = {
+
+            'J': 'jack',
+
+            'Q': 'queen',
+
+            'K': 'king',
+
+            'A': 'ace'
+
+        };
+
+
+        const suitMap = {
+
+            '♠': 'spades',
+
+            '♥': 'hearts',
+
+            '♦': 'diamonds',
+
+            '♣': 'clubs'
+
+        };
+
+
+        const rank =
+            alt.slice(0, -1).trim();
+
+        const suit =
+            alt.slice(-1);
+
+
+        const r =
+            rankMap[rank] || rank;
+
+        const s =
+            suitMap[suit];
+
+
+        return `cards/${r}_of_${s}.png`;
+
+    }
+
+
+    /*
+      На всякий случай при старте
+      выставляем правильный порядок.
+    */
+    reorderSuitRows();
+
+</script>
+
+</body>
+</html>
